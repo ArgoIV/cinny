@@ -1572,6 +1572,10 @@ export function RoomTimeline({ room, eventId, roomInputRef, editor }: RoomTimeli
   let isPrevRendered = false;
   let newDivider = false;
   let dayDivider = false;
+  const getSender = (evt: MatrixEvent) => {
+    const pmp = evt.getContent()["com.beeper.per_message_profile"];
+    return pmp && pmp.id ? pmp.id : evt.getSender();
+  }
   const eventRenderer = (item: number) => {
     const [eventTimeline, baseIndex] = getTimelineAndBaseIndex(timeline.linkedTimelines, item);
     if (!eventTimeline) return null;
@@ -1581,7 +1585,7 @@ export function RoomTimeline({ room, eventId, roomInputRef, editor }: RoomTimeli
 
     if (!mEvent || !mEventId) return null;
 
-    const eventSender = mEvent.getSender();
+    const eventSender = getSender(mEvent);
     if (eventSender && ignoredUsersSet.has(eventSender)) {
       return null;
     }

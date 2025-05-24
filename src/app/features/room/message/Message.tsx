@@ -720,9 +720,15 @@ export const Message = as<'div', MessageProps>(
     },
     ref
   ) => {
+    const getSender = (evt: MatrixEvent) => {
+      const pmp = evt.getContent()["com.beeper.per_message_profile"];
+      return pmp && pmp.id ? pmp.id : evt.getSender();
+    }
+
     const mx = useMatrixClient();
     const useAuthentication = useMediaAuthentication();
-    const senderId = mEvent.getSender() ?? '';
+    const originalSenderId = mEvent.getSender() ?? '';
+    const senderId = getSender(mEvent) ?? '';
 
     const [hover, setHover] = useState(false);
     const { hoverProps } = useHover({ onHoverChange: setHover });
@@ -730,9 +736,10 @@ export const Message = as<'div', MessageProps>(
     const [menuAnchor, setMenuAnchor] = useState<RectCords>();
     const [emojiBoardAnchor, setEmojiBoardAnchor] = useState<RectCords>();
 
-    const senderDisplayName =
-      getMemberDisplayName(room, senderId) ?? getMxIdLocalPart(senderId) ?? senderId;
-    const senderAvatarMxc = getMemberAvatarMxc(room, senderId);
+    const originalSenderDisplayName =
+      getMemberDisplayName(room, originalSenderId) ?? getMxIdLocalPart(originalSenderId) ?? originalSenderId;
+    let senderDisplayName = originalSenderDisplayName;
+    let senderAvatarMxc = getMemberAvatarMxc(room, senderId);
 
     const tagColor = memberPowerTag?.color
       ? accessibleTagColors?.get(memberPowerTag.color)
@@ -742,6 +749,17 @@ export const Message = as<'div', MessageProps>(
       : undefined;
 
     const usernameColor = legacyUsernameColor ? colorMXID(senderId) : tagColor;
+    const pmp = mEvent.getEffectiveEvent().content["com.beeper.per_message_profile"];
+
+    if(pmp?.id) {
+      if(typeof pmp?.displayname === 'string') {
+        senderDisplayName = pmp.displayname;
+      }
+      if(typeof pmp?.avatar_url === 'string') {
+        senderAvatarMxc = `${pmp.avatar_url}`;
+      }
+    }
+    const noOp = () => undefined;
 
     const headerJSX = !collapse && (
       <Box
@@ -756,8 +774,8 @@ export const Message = as<'div', MessageProps>(
             as="button"
             style={{ color: usernameColor }}
             data-user-id={senderId}
-            onContextMenu={onUserClick}
-            onClick={onUsernameClick}
+            onContextMenu={pmp ? noOp : onUserClick}
+            onClick={pmp ? noOp : onUsernameClick}
           >
             <Text
               as="span"
@@ -767,6 +785,20 @@ export const Message = as<'div', MessageProps>(
               <UsernameBold>{senderDisplayName}</UsernameBold>
             </Text>
           </Username>
+          {
+            pmp && <Text as="span" size='T200'>
+              &nbsp;via <Username
+              as="button"
+              style={{ color: colorMXID(originalSenderId) }}
+              data-user-id={originalSenderId}
+              onContextMenu={onUserClick}
+              onClick={onUsernameClick}
+            >
+              <b>{originalSenderDisplayName}</b>
+            </Username>
+            </Text>
+          }
+
           {tagIconSrc && <PowerIcon size="100" iconSrc={tagIconSrc} />}
         </Box>
         <Box shrink="No" gap="100">
@@ -798,11 +830,11 @@ export const Message = as<'div', MessageProps>(
           className={css.MessageAvatar}
           as="button"
           size="300"
-          data-user-id={senderId}
+          data-user-id={originalSenderId}
           onClick={onUserClick}
         >
           <UserAvatar
-            userId={senderId}
+            userId={originalSenderId}
             src={
               senderAvatarMxc
                 ? mxcUrlToHttp(mx, senderAvatarMxc, useAuthentication, 48, 48, 'crop') ?? undefined
